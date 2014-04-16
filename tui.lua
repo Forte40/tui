@@ -1,13 +1,15 @@
 Panel = {}
 
+local nextId = 0
 setmetatable(Panel, {
   __call = function(self, arg)
-    local panel = {}
+    nextId = nextId + 1
+    local panel = {id = nextId}
     setmetatable(panel, self)
     self.__index = self
     -- top, bottom, left, right, fill (default)
     panel.side = arg.side or "fill"
-    panel.size = arg.size or 0
+    panel.size = arg.size
     panel.color = arg.color
     if type(arg.inside) == "table" then
       panel.inside = {}
@@ -39,7 +41,7 @@ function Panel:resize(top, left, rows, cols)
         if not widget.size then
           widget.size = cols
         end
-        widget:resize(top, left, rows, math.min(widget.size, cols))
+        widget:resize(top, left + cols - math.min(widget.size, cols), rows, math.min(widget.size, cols))
         cols = cols - widget.cols
       elseif widget.side == "top" then
         if not widget.size then
@@ -52,7 +54,7 @@ function Panel:resize(top, left, rows, cols)
         if not widget.size then
           widget.size = rows
         end
-        widget:resize(top, left, math.min(widget.size, rows), cols)
+        widget:resize(top + rows - math.min(widget.size, rows), left, math.min(widget.size, rows), cols)
         rows = rows - widget.rows
       else
         widget:resize(top, left, rows, cols)
@@ -65,8 +67,8 @@ function Panel:resize(top, left, rows, cols)
   end
 end
 
-function Panel:display()
-  print(string.format("%d,%d %dx%d", self.top, self.left, self.rows, self.cols))
+function Panel:display(term)
+  print(string.format("%s: %d,%d %dx%d", self.side, self.top, self.left, self.rows, self.cols))
   if self.inside then
     for i, widget in ipairs(self.inside) do
       widget:display()
@@ -74,13 +76,49 @@ function Panel:display()
   end
 end
 
-a = Panel{side="top", inside={
-  Panel{side="left"},
-  Panel{side="right"}
+Term = {}
+function Term:new(rows, cols)
+  local obj = {}
+  setmetatable(obj, self)
+  self.__index = self
+  obj.rows = rows
+  obj.cols = cols
+  obj.text = {}
+  for row = 1, rows do
+    table.insert(obj.text, {})
+    for col = 1, cols do
+      table.insert(obj.text[row], ".")
+    end
+  end
+  return obj
+end
+function Term:getSize()
+  return self.rows, self.cols
+end
+function Term:display()
+  for row, rowData in ipairs(self.text) do
+    for col, colData in ipairs(rowData) do
+      io.write(colData)
+    end
+    io.write("\n")
+  end
+end
+function Term:setChar(row, col, char)
+  self.text[row][col] = char
+end
+
+t = Term:new(12, 12)
+
+a = Panel{spacing=1, inside={
+  Panel{side="left", size=4},
+  Panel{side="right", size=4},
+  Panel{side="top", size=3},
+  Panel{side="bottom", size=3},
+  Panel{}
 }}
 for k, v in pairs(a) do
   print(k, ":", v)
 end
-a:resize(0, 0, 2, 3)
-a:display()
-
+a:resize(0, 0, 12, 12)
+a:display(t)
+t:display()
