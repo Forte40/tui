@@ -48,6 +48,13 @@ function Widget:create(arg)
   widget.bgChar = arg.bgChar or " "
   widget.borderChars = arg.borderChars or {" ", " ", " "}
 
+  widget.borderTextColor = arg.borderTextColor or colors.white
+  widget.borderBackgroundColor = arg.borderBackgroundColor or colors.black
+  widget.bgTextColor = arg.bgTextColor or colors.white
+  widget.bgBackgroundColor = arg.bgBackgroundColor or colors.black
+  widget.textColor = arg.textColor or colors.white
+  widget.backgroundColor = arg.backgroundColor or colors.black
+
   return widget
 end
 
@@ -78,19 +85,27 @@ function Widget:display()
         if col < self.left + self.padding
             or col > self.left + self.cols - 1 - self.padding then
           -- corner border
+          self.term.setTextColor(self.borderTextColor)
+          self.term.setBackgroundColor(self.borderBackgroundColor)
           self.term.setCursorPos(col, row)
           self.term.write(self.borderChars[1])
         else
           -- top / bottom border
+          self.term.setTextColor(self.borderTextColor)
+          self.term.setBackgroundColor(self.borderBackgroundColor)
           self.term.setCursorPos(col, row)
           self.term.write(self.borderChars[2])
         end
       elseif col < self.left + self.padding
           or col > self.left + self.cols - 1 - self.padding then
         -- left / right border
+          self.term.setTextColor(self.borderTextColor)
+          self.term.setBackgroundColor(self.borderBackgroundColor)
         self.term.setCursorPos(col, row)
         self.term.write(self.borderChars[3])
       else
+          self.term.setTextColor(self.bgTextColor)
+          self.term.setBackgroundColor(self.bbBackgroundColor)
         self.term.setCursorPos(col, row)
         self.term.write(self.bgChar)
       end
@@ -279,6 +294,8 @@ function Panel:display()
   -- display title
   if self.title and self.padding > 0 then
     local left = math.max(0, math.min(2, self.cols - self.title:len()))
+    self.term.setTextColor(self.borderTextColor)
+    self.term.setBackgroundColor(self.borderBackgroundColor)
     self.term.setCursorPos(self.left + left, self.top)
     self.term.write(self.title:sub(1, self.cols))
   end
@@ -387,6 +404,8 @@ function Button:display()
   local cols = self.cols - self.padding * 2
   local top = self.top + self.padding + math.floor((rows - 1) / 2)
   local left = self.left + self.padding + math.floor((cols - text:len())/2)
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
   self.term.setCursorPos(left, top)
   self.term.write(text:sub(1, cols))
 end

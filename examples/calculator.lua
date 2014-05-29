@@ -108,7 +108,7 @@ end
 -- calculator interface
 
 local calculator = Grid{
-  gridRows=5, gridCols=6, spacing=1,
+  gridRows=5, gridCols=6, spacing=1, bgBackgroundColor=colors.white,
   inside={
     Button{name="close", text="X"},
     Button{name="number_field", text="0", colSpan=5},
