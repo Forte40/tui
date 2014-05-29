@@ -218,4 +218,4 @@ function close:mouse_click()
   self.stop()
 end
 
-calculator.run(term)
+calculator:run(term)

@@ -383,7 +383,7 @@ function Widget:run(term)
   local cols, rows = term.getSize()
   self:resize(1, 1, cols, rows, term)
   self:display()
-  while true do
+  while self.running do
     local event = {os.pullEvent()}
     event.name = table.remove(event, 1)
     local widgets = {}
