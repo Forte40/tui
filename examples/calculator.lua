@@ -152,6 +152,10 @@ function decimal:mouse_click()
   calc:decimal()
 end
 
+function negative:mouse_click()
+  calc:negative()
+end
+
 function opClick(self)
   calc:operation(self.text[self.value])
 end
