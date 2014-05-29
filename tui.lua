@@ -411,9 +411,9 @@ function Button:display()
 end
 
 function Button:mouse_click(evt)
-  button.value = button.value + 1
-  if button.value > #button.text then
-    button.value = 1
+  self.value = self.value + 1
+  if self.value > #self.text then
+    self.value = 1
   end
   Button.display(self)
 end
