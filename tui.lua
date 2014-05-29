@@ -48,12 +48,12 @@ function Widget:create(arg)
   widget.bgChar = arg.bgChar or " "
   widget.borderChars = arg.borderChars or {" ", " ", " "}
 
-  widget.borderTextColor = arg.borderTextColor or colors.white
-  widget.borderBackgroundColor = arg.borderBackgroundColor or colors.black
-  widget.bgTextColor = arg.bgTextColor or colors.white
-  widget.bgBackgroundColor = arg.bgBackgroundColor or colors.black
   widget.textColor = arg.textColor or colors.white
   widget.backgroundColor = arg.backgroundColor or colors.black
+  widget.bgTextColor = arg.bgTextColor or widget.textColor
+  widget.bgBackgroundColor = arg.bgBackgroundColor or widget.backgroundColor
+  widget.borderTextColor = arg.borderTextColor or widget.bgTextColor
+  widget.borderBackgroundColor = arg.borderBackgroundColor or widget.bgBackgroundColor
 
   return widget
 end
@@ -99,13 +99,13 @@ function Widget:display()
       elseif col < self.left + self.padding
           or col > self.left + self.cols - 1 - self.padding then
         -- left / right border
-          self.term.setTextColor(self.borderTextColor)
-          self.term.setBackgroundColor(self.borderBackgroundColor)
+        self.term.setTextColor(self.borderTextColor)
+        self.term.setBackgroundColor(self.borderBackgroundColor)
         self.term.setCursorPos(col, row)
         self.term.write(self.borderChars[3])
       else
-          self.term.setTextColor(self.bgTextColor)
-          self.term.setBackgroundColor(self.bbBackgroundColor)
+        self.term.setTextColor(self.bgTextColor)
+        self.term.setBackgroundColor(self.bgBackgroundColor)
         self.term.setCursorPos(col, row)
         self.term.write(self.bgChar)
       end
