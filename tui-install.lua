@@ -1,4 +1,4 @@
---http://pastebin.com/????????
+--http://pastebin.com/Q6kbaxKJ
 
 if not http then
   print("No access to web")
