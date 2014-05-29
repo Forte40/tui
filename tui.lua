@@ -4,7 +4,7 @@ setfenv(2, env)
 setfenv(1, env)
 local names = {}
 
--- Base class for all the things ----------------------------------------------
+-- Base class for all the things and event loop -------------------------------
 Widget = {type="widget"}
 Widget.__index = Widget
 
@@ -95,6 +95,63 @@ function Widget:display()
         self.term.write(self.bgChar)
       end
     end
+  end
+end
+
+function Widget:run(term)
+  self.running = true
+  local cols, rows = term.getSize()
+  self:resize(1, 1, cols, rows, term)
+  self:display()
+  while self.running do
+    local event = {os.pullEvent()}
+    event.name = table.remove(event, 1)
+    local widgets = {}
+    local widget = self
+    local propagate = true
+    -- trickle down listeners
+    while widget ~= nil do
+      table.insert(widgets, 1, widget)
+      -- look for listener on current widget
+      if widget["capture_" .. event.name] ~= nil then
+        local result = widget["capture_" .. event.name](widget, unpack(event))
+        if result == false then
+          propagate = false
+          break
+        end
+      end
+      -- get inside widget based on focus or location
+      if event.name == "mouse_click" or 
+          event.name == "mouse_scroll" or 
+          event.name == "mouse_drag" or 
+          event.name == "monitor_touch" then
+        widget = widget.hit and widget:hit(event[2], event[3]) or nil
+      else
+        widget = widget.focus
+      end
+      if type(widget) == "boolean" then
+        widget = nil
+      end
+    end
+    -- bubble up listeners
+    if propagate then
+      for i, widget in ipairs(widgets) do
+        if widget[event.name] ~= nil then
+          local result = widget[event.name](widget, unpack(event))
+          if result == false then
+            propagate = false
+            break
+          end
+        end
+      end
+    end
+  end
+end
+
+function Widget:stop()
+  self.running = nil
+  if self.outside then
+    self.outside.stop()
   end
 end
 
@@ -347,17 +404,7 @@ setmetatable(Button, {
   __call = Button.create
 })
 
--- event stuff ----------------------------------------------------------------
---[[
-Events:
-  monitor_touch
-  mouse_click
-  mouse_scroll
-  mouse_drag
-  key
-  char
---]]
-
+-- Event listener -------------------------------------------------------------
 function listen(widget, event, fn, capture)
   capture = type(capture) == "boolean" and capture or false
   if capture then
@@ -375,62 +422,5 @@ function listen(widget, event, fn, capture)
     widget[event] = fn
   else
     error("listener not attached, "..tostring(widget))
-  end
-end
-
-function Widget:run(term)
-  self.running = true
-  local cols, rows = term.getSize()
-  self:resize(1, 1, cols, rows, term)
-  self:display()
-  while self.running do
-    local event = {os.pullEvent()}
-    event.name = table.remove(event, 1)
-    local widgets = {}
-    local currWidget = widget
-    local propagate = true
-    -- trickle down listeners
-    while currWidget ~= nil do
-      table.insert(widgets, 1, currWidget)
-      -- look for listener on current widget
-      if currWidget["capture_" .. event.name] ~= nil then
-        local result = currWidget["capture_" .. event.name](currWidget, unpack(event))
-        if result == false then
-          propagate = false
-          break
-        end
-      end
-      -- get inside widget based on focus or location
-      if event.name == "mouse_click" or 
-          event.name == "mouse_scroll" or 
-          event.name == "mouse_drag" or 
-          event.name == "monitor_touch" then
-        currWidget = currWidget.hit and currWidget:hit(event[2], event[3]) or nil
-      else
-        currWidget = currWidget.focus
-      end
-      if type(currWidget) == "boolean" then
-        currWidget = nil
-      end
-    end
-    -- bubble up listeners
-    if propagate then
-      for i, currWidget in ipairs(widgets) do
-        if currWidget[event.name] ~= nil then
-          local result = currWidget[event.name](currWidget, unpack(event))
-          if result == false then
-            propagate = false
-            break
-          end
-        end
-      end
-    end
-  end
-end
-
-function Widget:stop()
-  self.running = nil
-  if self.outside then
-    self.outside.stop()
   end
 end

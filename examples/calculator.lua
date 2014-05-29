@@ -215,7 +215,7 @@ function calculator:key(key)
 end
 
 function close:mouse_click()
-  self.stop()
+  self:stop()
 end
 
 calculator:run(term)
