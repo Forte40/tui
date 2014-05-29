@@ -109,10 +109,10 @@ end
 
 local calculator = Grid{
   gridRows=5, gridCols=6, spacing=1,
-  backgroundColor=colors.grey,
+  backgroundColor=colors.gray,
   inside={
-    Button{name="close", text="X"},
-    Button{name="number_field", text="0", colSpan=5},
+    Button{name="close", text="X", backgroundColor=colors.gray, textColor=colors.red},
+    Button{name="number_field", text="0", colSpan=5, backgroundColor=colors.lime, textColor=colors.black},
     Button{name="recall", text="MR", backgroundColor=colors.purple},
     Button{name="number7", text="7", data=7, backgroundColor=colors.lightBlue},
     Button{name="number8", text="8", data=8, backgroundColor=colors.lightBlue},
@@ -135,7 +135,7 @@ local calculator = Grid{
     Button{name="equal", text="=", rowSpan=2},
 
     Button{name="reciprocal", text="1/x"},
-    Button{name="number0", text="0", data=0, colSpan=2},
+    Button{name="number0", text="0", data=0, colSpan=2, backgroundColor=colors.lightBlue},
     Button{name="decimal", text=".", backgroundColor=colors.lightBlue},
     Button{name="add", text="+"},
   }
