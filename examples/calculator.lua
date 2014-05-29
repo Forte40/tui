@@ -56,10 +56,6 @@ function calc:reciprocal()
   self.display = 1/self.display
   self.scan = false
 end
-function calc:pow()
-  self.display = math.pow() .sqrt(self.display)
-  self.scan = false
-end
 function calc:operation(op)
   self:calc()
   self.op = op
@@ -130,7 +126,7 @@ local calculator = Grid{
     Button{name="multiply", text="*", bgChar="."},
     Button{name="negative", text="+/-", bgChar="."},
 
-    Button{name="pow", text="^", bgChar="."},
+    Button{name="power", text="^", bgChar="."},
     Button{name="number1", text="1", data=1, bgChar="."},
     Button{name="number2", text="2", data=2, bgChar="."},
     Button{name="number3", text="3", data=3, bgChar="."},
@@ -146,52 +142,49 @@ local calculator = Grid{
 
 function numberClick(self)
   calc:number(self.data)
-  number_field.text[1] = tostring(calc.display)
 end
-
 for num = 0, 9 do
   listen("number"..tostring(num), "mouse_click", numberClick)
 end
 
 function decimal:mouse_click()
   calc:decimal()
-  number_field.text[1] = tostring(calc.display)
 end
 
 function opClick(self)
   calc:operation(self.text[self.value])
-  number_field.text[1] = tostring(calc.display)
 end
-
-listen("add", "mouse_click", opClick)
-listen("subtract", "mouse_click", opClick)
-listen("multiply", "mouse_click", opClick)
-listen("divide", "mouse_click", opClick)
-listen("pow", "mouse_click", opClick)
+for _, op in ipairs({"add", "subtract", "multiply", "divide", "power"}) do
+  listen(op, "mouse_click", opClick)
+end
 
 function reciprocal:mouse_click()
   calc:reciprocal()
-  number_field.text[1] = tostring(calc.display)
 end
 
 function equal:mouse_click()
   calc:equal()
-  number_field.text[1] = tostring(calc.display)
 end
 
 function clear:mouse_click()
   calc:clear()
-  number_field.text[1] = tostring(calc.display)
 end
 
 function store:mouse_click()
   calc:store()
-  number_field.text[1] = tostring(calc.display)
 end
 
 function recall:mouse_click()
   calc:recall()
+end
+
+function close:mouse_click()
+  self:stop()
+end
+
+function calculator:mouse_click()
   number_field.text[1] = tostring(calc.display)
+  number_field:display()
 end
 
 function calculator:char(char)
@@ -204,6 +197,8 @@ function calculator:char(char)
   elseif char == "=" then
     calc:equal()
   end
+  number_field.text[1] = tostring(calc.display)
+  number_field:display()
 end
 
 function calculator:key(key)
@@ -212,10 +207,8 @@ function calculator:key(key)
   elseif key == keys.delete then
     calc:clear()
   end
-end
-
-function close:mouse_click()
-  self:stop()
+  number_field.text[1] = tostring(calc.display)
+  number_field:display()
 end
 
 calculator:run(term)

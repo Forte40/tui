@@ -151,7 +151,7 @@ end
 function Widget:stop()
   self.running = nil
   if self.outside then
-    self.outside.stop()
+    self.outside:stop()
   end
 end
 
