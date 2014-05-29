@@ -115,6 +115,7 @@ end
 
 function Widget:run(term)
   self.running = true
+  term.clear()
   local cols, rows = term.getSize()
   self:resize(1, 1, cols, rows, term)
   self:display()
@@ -161,6 +162,8 @@ function Widget:run(term)
       end
     end
   end
+  term.clear()
+  term.setCursorPos(1, 1)
 end
 
 function Widget:stop()
