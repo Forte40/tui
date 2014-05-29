@@ -4,16 +4,6 @@ setfenv(2, env)
 setfenv(1, env)
 local names = {}
 
---[[ widget interface
-properties
-  name
-  left, top, cols, rows
-functions
-  resize - change layout for drawing and resize child controls
-  display - draw chars to term using standard term functions
-  hit - custom hit code, usually not needed
---]]
-
 -- Base class for all the things ----------------------------------------------
 Widget = {type="widget"}
 Widget.__index = Widget
@@ -345,9 +335,9 @@ function Button:display()
 end
 
 function Button:mouse_click(evt)
-  self.value = self.value + 1
-  if self.value > #self.text then
-    self.value = 1
+  button.value = button.value + 1
+  if button.value > #button.text then
+    button.value = 1
   end
   Button.display(self)
 end
@@ -388,10 +378,11 @@ function listen(widget, event, fn, capture)
   end
 end
 
-function run(widget, term)
+function Widget:run(term)
+  self.running = true
   local cols, rows = term.getSize()
-  widget:resize(1, 1, cols, rows, term)
-  widget:display()
+  self:resize(1, 1, cols, rows, term)
+  self:display()
   while true do
     local event = {os.pullEvent()}
     event.name = table.remove(event, 1)
@@ -437,11 +428,9 @@ function run(widget, term)
   end
 end
 
-function setenv(e)
-  env = e
-  env.Panel = Panel
-  env.Grid = Grid
-  env.Button = Button
-  env.listen = listen
-  env.run = run
+function Widget:stop()
+  self.running = nil
+  if self.outside then
+    self.outside.stop()
+  end
 end
