@@ -119,6 +119,19 @@ function Widget:run(term)
   local cols, rows = term.getSize()
   self:resize(1, 1, cols, rows, term)
   self:display()
+  local widget = self
+  -- set cursor position and blink
+  while widget ~= nil do
+    if widget.display_focus then
+      widget:display_focus()
+      widget = nil
+    else
+      widget = widget.focus
+    end
+    if type(widget) == "boolean" then
+      widget = nil
+    end
+  end
   while self.running do
     local event = {os.pullEvent()}
     event.name = table.remove(event, 1)
@@ -162,6 +175,8 @@ function Widget:run(term)
       end
     end
   end
+  term.setBackgroundColor(colors.black)
+  term.setTextColor(colors.white)
   term.clear()
   term.setCursorPos(1, 1)
 end
@@ -390,6 +405,7 @@ Button.__index = Button
 function Button:create(arg)
   local button = Widget.create(self, arg)
 
+  button.focus = arg.focus or false
   if type(arg.text) == "table" then
     button.text = arg.text
   else
@@ -402,9 +418,9 @@ end
 
 function Button:display()
   Widget.display(self)
-  local text = self.text[self.value]:sub(1, cols)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
+  local text = self.text[self.value]:sub(1, cols)
   local top = self.top + self.padding + math.floor((rows - 1) / 2)
   local left = self.left + self.padding + math.floor((cols - text:len())/2)
   self.term.setTextColor(self.textColor)
@@ -424,6 +440,85 @@ end
 setmetatable(Button, {
   __index = Widget,
   __call = Button.create
+})
+
+-- Text widget ----------------------------------------------------------------
+Text = {type="text"}
+Text.__index = Text
+
+function Text:create(arg)
+  local text = Widget.create(self, arg)
+
+  text.focus = arg.focus or false
+  text.value = tostring(arg.value or "")
+  text.pos = arg.pos or arg.value:len()
+
+  return text
+end
+
+function Text:display()
+  Widget.display(self)
+  local rows = self.rows - self.padding * 2
+  local cols = self.cols - self.padding * 2
+  local text = self.value:sub(1, cols)
+  local top = self.top + self.padding
+  local left = self.left + self.padding
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
+  self.term.setCursorPos(left, top)
+  self.term.write(text:sub(1, cols))
+end
+
+function Text:display_focus()
+  local top = self.top + self.padding
+  local left = self.left + self.padding + self.pos  
+  self.term.setCursorPos(left, top)
+  self.term.setCursorBlink(true)
+end
+
+function Text:char(char)
+  self.value = self.value:sub(1, self.pos) .. char .. self.value:sub(self.pos + 1)
+  self.pos = self.pos + 1
+  self:display()
+  self:display_focus()
+  return false
+end
+
+function Text:key(key)
+  if key == keys.delete then
+    if self.pos < self.value:len() then
+      self.value = self.value:sub(1, self.pos) .. self.value:sub(self.pos + 2)
+      self:display()
+      self:display_focus()
+    end
+  elseif key == keys.backspace then
+    if self.pos > 0 then
+      self.value = self.value:sub(1, self.pos - 1) .. self.value:sub(self.pos + 1)
+      self.pos = self.pos - 1
+      self:display()
+      self:display_focus()
+    end
+  elseif key == keys.left then
+    self.pos = math.max(0, self.pos - 1)
+    self:display_focus()
+  elseif key == keys.right then
+    self.pos = math.min(self.value:len(), self.pos + 1)
+    self:display_focus()
+  elseif key == keys.home then
+    self.pos = 0
+    self:display_focus()
+  elseif key == keys["end"] then
+    self.pos = self.value:len()
+    self:display_focus()
+  else
+    return true
+  end
+  return false
+end
+
+setmetatable(Text, {
+  __index = Widget,
+  __call = Text.create
 })
 
 -- Event listener -------------------------------------------------------------
