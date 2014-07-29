@@ -282,7 +282,7 @@ function Panel:resize(left, top, cols, rows, term)
         widget:resize(left, top + rows - math.min(widget.size, rows), cols, math.min(widget.size, rows), term)
         rows = math.max(0, rows - widget.rows - self.spacing)
       else
-        widget:resize(left, top, cols, rows)
+        widget:resize(left, top, cols, rows, term)
         left = left + cols
         top = top + rows
         cols = 0
