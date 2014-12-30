@@ -1,7 +1,8 @@
-local env = {}
-setmetatable(env, {__index = _G})
-setfenv(2, env)
-setfenv(1, env)
+local env = {} -- create temp environment that will go away when the script ends
+setmetatable(env, {__index = _G}) -- populate with global environment
+setfenv(2, env) -- set calling script to this new environment
+setfenv(1, env) -- set this script to this new environment
+
 local names = {}
 
 -- Base class for all the things and event loop -------------------------------
@@ -396,6 +397,50 @@ end
 setmetatable(Grid, {
   __index = Container,
   __call = Grid.create
+})
+
+-- Label widget, rotates between states on click ------------------------------
+Button = {type="button"}
+Button.__index = Button
+
+function Button:create(arg)
+  local button = Widget.create(self, arg)
+
+  button.focus = arg.focus or false
+  if type(arg.text) == "table" then
+    button.text = arg.text
+  else
+    button.text = {arg.text}
+  end
+  button.value = arg.value or 1
+
+  return button
+end
+
+function Button:display()
+  Widget.display(self)
+  local rows = self.rows - self.padding * 2
+  local cols = self.cols - self.padding * 2
+  local text = self.text[self.value]:sub(1, cols)
+  local top = self.top + self.padding + math.floor((rows - 1) / 2)
+  local left = self.left + self.padding + math.floor((cols - text:len())/2)
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
+  self.term.setCursorPos(left, top)
+  self.term.write(text:sub(1, cols))
+end
+
+function Button:mouse_click(evt)
+  self.value = self.value + 1
+  if self.value > #self.text then
+    self.value = 1
+  end
+  Button.display(self)
+end
+
+setmetatable(Button, {
+  __index = Widget,
+  __call = Button.create
 })
 
 -- Button widget, rotates between states on click -----------------------------

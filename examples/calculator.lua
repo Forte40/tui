@@ -1,4 +1,21 @@
-loadfile("tui")()
+if term == nil then
+  require("term")
+end
+if colors == nil then
+  require("colors")
+end
+if loadfile == nil then
+  loadfile = function( _sFile )
+    local file = fs.open( _sFile, "r" )
+    if file then
+      local func, err = loadstring( file.readAll(), fs.getName( _sFile ) )
+      file.close()
+      return func, err
+    end
+    return nil, "File not found"
+  end
+end
+loadfile("tui.lua")()
 
 -- calculator logic
 local calc = {
