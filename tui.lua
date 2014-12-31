@@ -114,7 +114,35 @@ function Widget:display()
   end
 end
 
-function Widget:run(term)
+function Widget:setFocus(widget)
+  self.focus = widget
+  if self.outside then
+    self.outside:setFocus()
+  end
+end
+
+function Widget:displayFocus()
+  if type(self.focus) == "table" then
+    self.focus:displayFocus()
+  else
+    term.setCursorBlink(false)
+  end
+end
+
+function Widget:debug(msg)
+  if self.debugTerm then
+    local oldTerm = term.redirect(self.debugTerm)
+    print(msg)
+    term.redirect(oldTerm)
+  elseif self.outside then
+    self.outside:debug(msg)
+  end
+end
+
+function Widget:run(term, debugTerm)
+  self.debugTerm = debugTerm
+  debugTerm.clear()
+  debugTerm.setCursorPos(1, 1)
   self.running = true
   term.clear()
   local cols, rows = term.getSize()
@@ -123,8 +151,8 @@ function Widget:run(term)
   local widget = self
   -- set cursor position and blink
   while widget ~= nil do
-    if widget.display_focus then
-      widget:display_focus()
+    if widget.displayFocus then
+      widget:displayFocus()
       widget = nil
     else
       widget = widget.focus
@@ -206,15 +234,14 @@ function Container:create(arg)
     for i, innerWidget in ipairs(arg.inside) do
       innerWidget.outside = container
       table.insert(container.inside, innerWidget)
-      if innerWidget.focus == true then
+      if innerWidget.focus ~= nil then
         focus = innerWidget
       end
     end
   end
-  if focus == nil and container.inside ~= nil and #container.inside > 0 then
-    focus = container.inside[1]
+  if focus ~= nil then
+    container.focus = focus
   end
-  container.focus = focus
 
   return container
 end
@@ -399,29 +426,24 @@ setmetatable(Grid, {
   __call = Grid.create
 })
 
--- Label widget, rotates between states on click ------------------------------
-Button = {type="button"}
-Button.__index = Button
+-- Label widget, text only ------------------------------
+Label = {type="label"}
+Label.__index = Label
 
-function Button:create(arg)
-  local button = Widget.create(self, arg)
+function Label:create(arg)
+  local label = Widget.create(self, arg)
 
-  button.focus = arg.focus or false
-  if type(arg.text) == "table" then
-    button.text = arg.text
-  else
-    button.text = {arg.text}
-  end
-  button.value = arg.value or 1
+  label.focus = arg.focus or nil
+  label.text = arg.text
 
-  return button
+  return label
 end
 
-function Button:display()
+function Label:display()
   Widget.display(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
-  local text = self.text[self.value]:sub(1, cols)
+  local text = self.text:sub(1, cols)
   local top = self.top + self.padding + math.floor((rows - 1) / 2)
   local left = self.left + self.padding + math.floor((cols - text:len())/2)
   self.term.setTextColor(self.textColor)
@@ -430,17 +452,89 @@ function Button:display()
   self.term.write(text:sub(1, cols))
 end
 
-function Button:mouse_click(evt)
-  self.value = self.value + 1
-  if self.value > #self.text then
-    self.value = 1
-  end
-  Button.display(self)
+setmetatable(Label, {
+  __index = Widget,
+  __call = Label.create
+})
+
+-- Spinner widget, number with buttons to increase or decrease value ------
+Spinner = {type="spinner"}
+Spinner.__index = Spinner
+
+function Spinner:create(arg)
+  local spinner = Widget.create(self, arg)
+
+  spinner.focus = arg.focus or nil
+  spinner.value = math.floor(tonumber(arg.value))
+  spinner.min = math.floor(tonumber(arg.min or 0))
+  spinner.max = math.floor(tonumber(arg.max or 9))
+
+  return spinner
 end
 
-setmetatable(Button, {
+function Spinner:display()
+  Widget.display(self)
+  local rows = self.rows - self.padding * 2
+  local cols = self.cols - self.padding * 2
+  local text = tostring(self.value):sub(1, cols - 2)
+  local top = self.top + self.padding + math.floor((rows - 1) / 2)
+  local left = self.left + self.padding + math.floor((cols - text:len())/2)
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
+  if self.value > self.min then
+    self.term.setCursorPos(self.left + self.padding, top)
+    self.term.write("<")
+  end
+  self.term.setCursorPos(left, top)
+  self.term.write(text:sub(1, cols))
+  if self.value < self.max then
+    self.term.setCursorPos(self.left + self.cols - self.padding - 1, top)
+    self.term.write(">")
+  end
+end
+
+function Spinner:inc(amount)
+  self.value = self.value + amount
+  if self.value > self.max then
+    self.value = self.max
+  end
+  self:display()
+end
+
+function Spinner:dec(amount)
+  self.value = self.value - amount
+  if self.value < self.min then
+    self.value = self.min
+  end
+  self:display()
+end
+
+function Spinner:set(amount)
+  self.value = amount
+  if self.value < self.min then
+    self.value = self.min
+  elseif self.value > self.max then
+    self.value = self.max
+  end
+  self:display()
+end
+
+function Spinner:mouse_click(btn, col, row)
+  self:setFocus()
+  if col == self.left + self.padding then
+    self:debug("dec")
+    self:dec(1)
+  elseif col == self.left + self.cols - self.padding - 1 then
+    self:debug("inc")
+    self:inc(1)
+  end
+  self:debug(string.format("%s : %s , %s", btn, col, row))
+  self:displayFocus()  
+end
+
+setmetatable(Spinner, {
   __index = Widget,
-  __call = Button.create
+  __call = Spinner.create
 })
 
 -- Button widget, rotates between states on click -----------------------------
@@ -450,7 +544,7 @@ Button.__index = Button
 function Button:create(arg)
   local button = Widget.create(self, arg)
 
-  button.focus = arg.focus or false
+  button.focus = arg.focus or nil
   if type(arg.text) == "table" then
     button.text = arg.text
   else
@@ -474,12 +568,14 @@ function Button:display()
   self.term.write(text:sub(1, cols))
 end
 
-function Button:mouse_click(evt)
+function Button:mouse_click()
   self.value = self.value + 1
   if self.value > #self.text then
     self.value = 1
   end
-  Button.display(self)
+  self:setFocus()
+  self:display()
+  self:displayFocus()
 end
 
 setmetatable(Button, {
@@ -494,7 +590,7 @@ Text.__index = Text
 function Text:create(arg)
   local text = Widget.create(self, arg)
 
-  text.focus = arg.focus or false
+  text.focus = arg.focus or nil
   text.value = tostring(arg.value or "")
   text.pos = arg.pos or arg.value:len()
 
@@ -514,18 +610,24 @@ function Text:display()
   self.term.write(text:sub(1, cols))
 end
 
-function Text:display_focus()
+function Text:displayFocus()
   local top = self.top + self.padding
   local left = self.left + self.padding + self.pos  
   self.term.setCursorPos(left, top)
   self.term.setCursorBlink(true)
 end
 
+function Text:mouse_click()
+  self:setFocus()
+  self:display()
+  self:displayFocus()
+end
+
 function Text:char(char)
   self.value = self.value:sub(1, self.pos) .. char .. self.value:sub(self.pos + 1)
   self.pos = self.pos + 1
   self:display()
-  self:display_focus()
+  self:displayFocus()
   return false
 end
 
@@ -534,27 +636,27 @@ function Text:key(key)
     if self.pos < self.value:len() then
       self.value = self.value:sub(1, self.pos) .. self.value:sub(self.pos + 2)
       self:display()
-      self:display_focus()
+      self:displayFocus()
     end
   elseif key == keys.backspace then
     if self.pos > 0 then
       self.value = self.value:sub(1, self.pos - 1) .. self.value:sub(self.pos + 1)
       self.pos = self.pos - 1
       self:display()
-      self:display_focus()
+      self:displayFocus()
     end
   elseif key == keys.left then
     self.pos = math.max(0, self.pos - 1)
-    self:display_focus()
+    self:displayFocus()
   elseif key == keys.right then
     self.pos = math.min(self.value:len(), self.pos + 1)
-    self:display_focus()
+    self:displayFocus()
   elseif key == keys.home then
     self.pos = 0
-    self:display_focus()
+    self:displayFocus()
   elseif key == keys["end"] then
     self.pos = self.value:len()
-    self:display_focus()
+    self:displayFocus()
   else
     return true
   end
