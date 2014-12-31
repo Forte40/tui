@@ -77,9 +77,32 @@ function Widget:resize(left, top, cols, rows, term)
   return left, top, cols, rows  
 end
 
-function Widget:display()
+function Widget.wrapDisplay(fn)
+  return function(self, final)
+    if final == nil then
+      final = true
+    end
+    self:debug("display "..self.name..(final and "*" or ""))
+    if final then
+      local widget = self
+      while widget.window == nil do
+        widget = widget.outside
+      end
+      window = widget.window
+      window.setVisible(false)
+    end
+    fn(self, final)
+    if final then
+      window.setVisible(true)
+      self:debug("draw")
+    end
+  end
+end
+
+function Widget:render()
   -- display border and background
   for row = self.top, self.top + self.rows - 1 do
+    --sleep(0.02)
     for col = self.left, self.left + self.cols - 1 do
       if row < self.top + self.padding
           or row > self.top + self.rows - 1 - self.padding then
@@ -114,6 +137,8 @@ function Widget:display()
   end
 end
 
+Widget.display = Widget.wrapDisplay(Widget.render)
+
 function Widget:setFocus(widget)
   self.focus = widget
   if self.outside then
@@ -144,9 +169,10 @@ function Widget:run(term, debugTerm)
   debugTerm.clear()
   debugTerm.setCursorPos(1, 1)
   self.running = true
-  term.clear()
+  --term.clear()
   local cols, rows = term.getSize()
-  self:resize(1, 1, cols, rows, term)
+  self.window = window.create(term.current(), 1, 1, cols, rows)
+  self:resize(1, 1, cols, rows, self.window)
   self:display()
   local widget = self
   -- set cursor position and blink
@@ -273,18 +299,20 @@ function Container:hit(col, row)
   end
 end
 
-function Container:display()
-  Widget.display(self)
+function Container:render()
+  Widget.render(self)
 
   -- display inside widgets
   if self.inside then
     for i, widget in ipairs(self.inside) do
       if widget.visible and widget.display then
-        widget:display()
+        widget:display(false)
       end
     end
   end
 end
+
+Container.display = Widget.wrapDisplay(Container.render)
 
 -- Tab, container that has multiple panels controlled by buttons -------------------------
 Tab = {type="tab"}
@@ -318,6 +346,9 @@ function Tab:addTab(name, widget)
   button.mouse_click = function()
     for btn, widget in pairs(self.widgets) do
       if btn == name then
+        if widget.visible then
+          return -- already visible, don't render
+        end
         widget.visible = true
       else
         widget.visible = false
@@ -401,8 +432,8 @@ function Panel:resize(left, top, cols, rows, term)
   end
 end
 
-function Panel:display()
-  Container.display(self)
+function Panel:render()
+  Container.render(self)
   -- display title
   if self.title and self.padding > 0 then
     local left = math.max(0, math.min(2, self.cols - self.title:len()))
@@ -412,6 +443,8 @@ function Panel:display()
     self.term.write(self.title:sub(1, self.cols))
   end
 end
+
+Panel.display = Widget.wrapDisplay(Panel.render)
 
 setmetatable(Panel, {
   __index = Container,
@@ -505,8 +538,8 @@ function Label:create(arg)
   return label
 end
 
-function Label:display()
-  Widget.display(self)
+function Label:render()
+  Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local text = self.text:sub(1, cols)
@@ -517,6 +550,8 @@ function Label:display()
   self.term.setCursorPos(left, top)
   self.term.write(text:sub(1, cols))
 end
+
+Label.display = Widget.wrapDisplay(Label.render)
 
 setmetatable(Label, {
   __index = Widget,
@@ -538,8 +573,8 @@ function Spinner:create(arg)
   return spinner
 end
 
-function Spinner:display()
-  Widget.display(self)
+function Spinner:render()
+  Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local text = tostring(self.value):sub(1, cols - 2)
@@ -558,6 +593,8 @@ function Spinner:display()
     self.term.write(">")
   end
 end
+
+Spinner.display = Widget.wrapDisplay(Spinner.render)
 
 function Spinner:inc(amount)
   self.value = self.value + amount
@@ -621,8 +658,8 @@ function Button:create(arg)
   return button
 end
 
-function Button:display()
-  Widget.display(self)
+function Button:render()
+  Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local text = self.text[self.value]:sub(1, cols)
@@ -633,6 +670,8 @@ function Button:display()
   self.term.setCursorPos(left, top)
   self.term.write(text:sub(1, cols))
 end
+
+Button.display = Widget.wrapDisplay(Button.render)
 
 function Button:mouse_click()
   self.value = self.value + 1
@@ -663,8 +702,8 @@ function Text:create(arg)
   return text
 end
 
-function Text:display()
-  Widget.display(self)
+function Text:render()
+  Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local text = self.value:sub(1, cols)
@@ -675,6 +714,8 @@ function Text:display()
   self.term.setCursorPos(left, top)
   self.term.write(text:sub(1, cols))
 end
+
+Text.display = Widget.wrapDisplay(Text.render)
 
 function Text:displayFocus()
   local top = self.top + self.padding
