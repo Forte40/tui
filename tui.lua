@@ -229,8 +229,8 @@ function Container:create(arg)
   container.spacing = arg.spacing or 0
   container.title = arg.title
   local focus
+  container.inside = {}
   if type(arg.inside) == "table" then
-    container.inside = {}
     for i, innerWidget in ipairs(arg.inside) do
       innerWidget.outside = container
       table.insert(container.inside, innerWidget)
@@ -241,9 +241,16 @@ function Container:create(arg)
   end
   if focus ~= nil then
     container.focus = focus
+  elseif arg.focus == true then
+    container.focus = true
   end
 
   return container
+end
+
+function Container:add(widget)
+  widget.outside = self
+  table.insert(self.inside, widget)
 end
 
 setmetatable(Container, {
@@ -278,6 +285,65 @@ function Container:display()
     end
   end
 end
+
+-- Tab, container that has multiple panels controlled by buttons -------------------------
+Tab = {type="tab"}
+Tab.__index = Tab
+
+function Tab:create(arg)
+  local tab = Container.create(self, arg)
+
+  -- set container default properties
+  tab.tabPanel = Panel{}
+  tab:add(tab.tabPanel)
+  tab.widgets = {}
+  for i, tabPair in ipairs(arg.tabs) do
+    tab:addTab(tabPair[1], tabPair[2])
+  end
+  tab.focus.visible = true
+
+  return tab
+end
+
+function Tab:addTab(name, widget)
+  local button = Button{side="left", size=#name+4, text="/ "..name.." \\"}
+  self.tabPanel:add(button)
+  self.widgets[name] = widget
+  self:add(widget)
+  widget.visible = false
+  if self.focus == nil or widget.focus == true then
+    self.focus = widget
+  end
+  local tab = self
+  button.mouse_click = function()
+    for btn, widget in pairs(self.widgets) do
+      if btn == name then
+        widget.visible = true
+      else
+        widget.visible = false
+      end
+    end
+    tab:display()
+  end
+end
+
+function Tab:resize(left, top, cols, rows, term)
+  left, top, cols, rows = Container.resize(self, left, top, cols, rows, term)
+
+  -- size tab buttons on top with height 1
+  self.tabPanel:resize(left, top, cols, 1, term)
+  -- loop through widgets allocating same space for each minus tab button row
+  top = top + 1
+  rows = rows - 1
+  for name, widget in pairs(self.widgets) do
+    widget:resize(left, top, cols, rows, term)
+  end
+end
+
+setmetatable(Tab, {
+  __index = Container,
+  __call = Tab.create
+})
 
 -- Container that allows for positioning on edges -----------------------------
 Panel = {type="panel"}
