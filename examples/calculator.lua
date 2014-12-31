@@ -1,20 +1,3 @@
-if term == nil then
-  require("term")
-end
-if colors == nil then
-  require("colors")
-end
-if loadfile == nil then
-  loadfile = function( _sFile )
-    local file = fs.open( _sFile, "r" )
-    if file then
-      local func, err = loadstring( file.readAll(), fs.getName( _sFile ) )
-      file.close()
-      return func, err
-    end
-    return nil, "File not found"
-  end
-end
 loadfile("tui.lua")()
 
 -- calculator logic
@@ -60,7 +43,7 @@ function calc:decimal()
     self.num = self.display
     self.mantissa = 1
     self.display = 0
-    self.scan = false
+    self.scan = true
   end
   if self.mantissa == 1 then
     self.mantissa = self.mantissa * 10
@@ -129,7 +112,7 @@ local calculator = Grid{
   backgroundColor=colors.gray,
   inside={
     Button{name="close", text="X", backgroundColor=colors.gray, textColor=colors.red},
-    Button{name="number_field", text="0", colSpan=5, backgroundColor=colors.lime, textColor=colors.black},
+    Label{name="number_field", text="0", colSpan=5, backgroundColor=colors.lime, textColor=colors.black},
     Button{name="recall", text="MR", backgroundColor=colors.purple},
     Button{name="number7", text="7", data=7, backgroundColor=colors.lightBlue},
     Button{name="number8", text="8", data=8, backgroundColor=colors.lightBlue},
@@ -205,8 +188,7 @@ function close:mouse_click()
 end
 
 function calculator:mouse_click()
-  number_field.text[1] = tostring(calc.display)
-  number_field:display()
+  self:show()
 end
 
 function calculator:char(char)
@@ -219,8 +201,7 @@ function calculator:char(char)
   elseif char == "=" then
     calc:equal()
   end
-  number_field.text[1] = tostring(calc.display)
-  number_field:display()
+  self:show()
 end
 
 function calculator:key(key)
@@ -229,7 +210,19 @@ function calculator:key(key)
   elseif key == keys.delete then
     calc:clear()
   end
-  number_field.text[1] = tostring(calc.display)
+  self:show()
+end
+
+function calculator:show()
+  if calc.op then
+    if calc.scan then
+      number_field.text = tostring(calc.num) .. " " .. calc.op .. " " .. tostring(calc.display)
+    else
+      number_field.text = tostring(calc.display) .. " " .. calc.op
+    end
+  else
+    number_field.text = tostring(calc.display)
+  end
   number_field:display()
 end
 
