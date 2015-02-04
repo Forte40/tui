@@ -5,6 +5,22 @@ setfenv(1, env) -- set this script to this new environment
 
 local names = {}
 
+function splitLines(str)
+  local lines = {}
+  local pos = 0
+  while true do
+    local newPos = str:find("\n", pos)
+    if newPos == nil then
+      table.insert(lines, str:sub(pos))
+      break
+    else
+      table.insert(lines, str:sub(pos, newPos - 1))
+      pos = newPos + 1
+    end
+  end
+  return lines
+end
+
 -- Base class for all the things and event loop -------------------------------
 Widget = {type="widget"}
 Widget.__index = Widget
@@ -533,7 +549,9 @@ function Label:create(arg)
   local label = Widget.create(self, arg)
 
   label.focus = arg.focus or nil
-  label.text = arg.text
+  label.align = arg.align or "center" -- left, right, center
+  label.valign = arg.valign or "middle" -- top, middle, bottom
+  label.value = splitLines(arg.value)
 
   return label
 end
@@ -542,13 +560,29 @@ function Label:render()
   Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
-  local text = self.text:sub(1, cols)
-  local top = self.top + self.padding + math.floor((rows - 1) / 2)
-  local left = self.left + self.padding + math.floor((cols - text:len())/2)
+  local top = self.top + self.padding
+  if self.valign == "top" then
+  elseif self.valign == "bottom" then
+    top = math.max(top, top + rows - #self.value)
+  else -- default to middle
+    top = math.max(top, top + math.floor((rows - #self.value) / 2))
+  end
   self.term.setTextColor(self.textColor)
   self.term.setBackgroundColor(self.backgroundColor)
-  self.term.setCursorPos(left, top)
-  self.term.write(text:sub(1, cols))
+  for i, val in ipairs(self.value) do
+    local left = self.left + self.padding
+    if self.align == "left" then
+    elseif self.align == "right" then
+      left = math.max(left, left + cols - #val)
+    else -- default to center
+      left = math.max(left, left + math.floor((cols - #val)/2))
+    end
+    self.term.setCursorPos(left, top + i - 1)
+    self.term.write(val:sub(1, cols))
+    if i >= rows then
+      break
+    end
+  end
 end
 
 Label.display = Widget.wrapDisplay(Label.render)
@@ -556,6 +590,93 @@ Label.display = Widget.wrapDisplay(Label.render)
 setmetatable(Label, {
   __index = Widget,
   __call = Label.create
+})
+
+-- Text widget ----------------------------------------------------------------
+Text = {type="text"}
+Text.__index = Text
+
+function Text:create(arg)
+  local text = Widget.create(self, arg)
+
+  text.focus = arg.focus or nil
+  text.value = tostring(arg.value or "")
+  text.pos = arg.pos or arg.value:len()
+
+  return text
+end
+
+function Text:render()
+  Widget.render(self)
+  local rows = self.rows - self.padding * 2
+  local cols = self.cols - self.padding * 2
+  local text = self.value:sub(1, cols)
+  local top = self.top + self.padding
+  local left = self.left + self.padding
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
+  self.term.setCursorPos(left, top)
+  self.term.write(text:sub(1, cols))
+end
+
+Text.display = Widget.wrapDisplay(Text.render)
+
+function Text:displayFocus()
+  local top = self.top + self.padding
+  local left = self.left + self.padding + self.pos  
+  self.term.setCursorPos(left, top)
+  self.term.setCursorBlink(true)
+end
+
+function Text:mouse_click()
+  self:setFocus()
+  self:display()
+  self:displayFocus()
+end
+
+function Text:char(char)
+  self.value = self.value:sub(1, self.pos) .. char .. self.value:sub(self.pos + 1)
+  self.pos = self.pos + 1
+  self:display()
+  self:displayFocus()
+  return false
+end
+
+function Text:key(key)
+  if key == keys.delete then
+    if self.pos < self.value:len() then
+      self.value = self.value:sub(1, self.pos) .. self.value:sub(self.pos + 2)
+      self:display()
+      self:displayFocus()
+    end
+  elseif key == keys.backspace then
+    if self.pos > 0 then
+      self.value = self.value:sub(1, self.pos - 1) .. self.value:sub(self.pos + 1)
+      self.pos = self.pos - 1
+      self:display()
+      self:displayFocus()
+    end
+  elseif key == keys.left then
+    self.pos = math.max(0, self.pos - 1)
+    self:displayFocus()
+  elseif key == keys.right then
+    self.pos = math.min(self.value:len(), self.pos + 1)
+    self:displayFocus()
+  elseif key == keys.home then
+    self.pos = 0
+    self:displayFocus()
+  elseif key == keys["end"] then
+    self.pos = self.value:len()
+    self:displayFocus()
+  else
+    return true
+  end
+  return false
+end
+
+setmetatable(Text, {
+  __index = Widget,
+  __call = Text.create
 })
 
 -- Spinner widget, number with buttons to increase or decrease value ------
@@ -686,93 +807,6 @@ end
 setmetatable(Button, {
   __index = Widget,
   __call = Button.create
-})
-
--- Text widget ----------------------------------------------------------------
-Text = {type="text"}
-Text.__index = Text
-
-function Text:create(arg)
-  local text = Widget.create(self, arg)
-
-  text.focus = arg.focus or nil
-  text.value = tostring(arg.value or "")
-  text.pos = arg.pos or arg.value:len()
-
-  return text
-end
-
-function Text:render()
-  Widget.render(self)
-  local rows = self.rows - self.padding * 2
-  local cols = self.cols - self.padding * 2
-  local text = self.value:sub(1, cols)
-  local top = self.top + self.padding
-  local left = self.left + self.padding
-  self.term.setTextColor(self.textColor)
-  self.term.setBackgroundColor(self.backgroundColor)
-  self.term.setCursorPos(left, top)
-  self.term.write(text:sub(1, cols))
-end
-
-Text.display = Widget.wrapDisplay(Text.render)
-
-function Text:displayFocus()
-  local top = self.top + self.padding
-  local left = self.left + self.padding + self.pos  
-  self.term.setCursorPos(left, top)
-  self.term.setCursorBlink(true)
-end
-
-function Text:mouse_click()
-  self:setFocus()
-  self:display()
-  self:displayFocus()
-end
-
-function Text:char(char)
-  self.value = self.value:sub(1, self.pos) .. char .. self.value:sub(self.pos + 1)
-  self.pos = self.pos + 1
-  self:display()
-  self:displayFocus()
-  return false
-end
-
-function Text:key(key)
-  if key == keys.delete then
-    if self.pos < self.value:len() then
-      self.value = self.value:sub(1, self.pos) .. self.value:sub(self.pos + 2)
-      self:display()
-      self:displayFocus()
-    end
-  elseif key == keys.backspace then
-    if self.pos > 0 then
-      self.value = self.value:sub(1, self.pos - 1) .. self.value:sub(self.pos + 1)
-      self.pos = self.pos - 1
-      self:display()
-      self:displayFocus()
-    end
-  elseif key == keys.left then
-    self.pos = math.max(0, self.pos - 1)
-    self:displayFocus()
-  elseif key == keys.right then
-    self.pos = math.min(self.value:len(), self.pos + 1)
-    self:displayFocus()
-  elseif key == keys.home then
-    self.pos = 0
-    self:displayFocus()
-  elseif key == keys["end"] then
-    self.pos = self.value:len()
-    self:displayFocus()
-  else
-    return true
-  end
-  return false
-end
-
-setmetatable(Text, {
-  __index = Widget,
-  __call = Text.create
 })
 
 -- Event listener -------------------------------------------------------------
