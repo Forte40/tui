@@ -98,7 +98,7 @@ function Widget.wrapDisplay(fn)
     if final == nil then
       final = true
     end
-    self:debug("display "..self.name..(final and "*" or ""))
+    --self:debug("display "..self.name..(final and "*" or ""))
     if final then
       local widget = self
       while widget.window == nil do
@@ -110,7 +110,7 @@ function Widget.wrapDisplay(fn)
     fn(self, final)
     if final then
       window.setVisible(true)
-      self:debug("draw")
+      --self:debug("draw")
     end
   end
 end
@@ -541,6 +541,137 @@ setmetatable(Grid, {
   __call = Grid.create
 })
 
+-- Scroll widget ----------------------------------------
+Scroll = {type="scroll"}
+Scroll.__index = Scroll
+
+function Scroll:create(arg)
+  local scroll = Widget.create(self, arg)
+
+  scroll.type = arg.type or "horz"
+  scroll.min = arg.min or 0
+  scroll.max = arg.max or 9
+  scroll.value = arg.value or scroll.min
+  scroll.range = arg.range or 0
+
+  return scroll
+end
+
+function Scroll:update()
+  self:debug(self.cols)
+  local length
+  if self.type == "vert" then
+    length = self.rows - self.padding * 2
+  else
+    length = self.cols - self.padding * 2
+  end
+  self.size = math.max(1, math.floor(0.5 + (length - 2) * math.max(self.range, 1) / (self.max - self.min + 1)))
+end
+
+function Scroll:resize(left, top, cols, rows, term)
+  left, top, cols, rows = Widget.resize(self, left, top, cols, rows, term)
+  self:update()
+end
+
+function Scroll:render()
+  Widget.render(self)
+  local rows = self.rows - self.padding * 2
+  local cols = self.cols - self.padding * 2
+  local top = self.top + self.padding
+  local left = self.left + self.padding
+  self.term.setTextColor(self.textColor)
+  self.term.setBackgroundColor(self.backgroundColor)
+  if self.type == "vert" then
+    local start = math.floor((rows - 2 - self.size) * (self.value - self.min) / ((self.max - self.range + 1) - self.min))
+    for row = 1, rows do
+      self.term.setCursorPos(left, top + row - 1)
+      for col = 1, cols do
+        if row == 1 then
+          self.term.write("^")
+        elseif row == rows then
+          self.term.write("v")
+        elseif (row >= start + 2) and (row < (start + 2 + self.size)) then
+          self.term.write("=")
+        else
+          self.term.write("|")
+        end
+      end
+    end
+  else
+    local start = math.floor((cols - 2 - self.size) * (self.value - self.min) / ((self.max - self.range + 1) - self.min))
+    for row = 1, rows do
+      self.term.setCursorPos(left, top + row - 1)
+      for col = 1, cols do
+        if col == 1 then
+          self.term.write("<")
+        elseif col == cols then
+          self.term.write(">")
+        elseif (col >= start + 2) and (col < (start + 2 + self.size)) then
+          self.term.write("=")
+        else
+          self.term.write("-")
+        end
+      end
+    end
+  end
+end
+
+Scroll.display = Widget.wrapDisplay(Scroll.render)
+
+function Scroll:inc(amount)
+  self.value = self.value + amount
+  if self.value > (self.max - self.range + 1) then
+    self.value = (self.max - self.range + 1)
+  end
+  self:display()
+end
+
+function Scroll:dec(amount)
+  self.value = self.value - amount
+  if self.value < self.min then
+    self.value = self.min
+  end
+  self:display()
+end
+
+function Scroll:set(amount)
+  self.value = amount
+  if self.value < self.min then
+    self.value = self.min
+  elseif self.value > (self.max - self.range + 1) then
+    self.value = (self.max - self.range + 1)
+  end
+  self:display()
+end
+
+function Scroll:mouse_click(btn, col, row)
+  self:setFocus()
+  if self.type == "vert" then
+    if row == self.top + self.padding then
+      --self:debug("dec")
+      self:dec(1)
+    elseif row == self.top + self.rows - self.padding - 1 then
+      --self:debug("inc")
+      self:inc(1)
+    end
+  else
+    if col == self.left + self.padding then
+      --self:debug("dec")
+      self:dec(1)
+    elseif col == self.left + self.cols - self.padding - 1 then
+      --self:debug("inc")
+      self:inc(1)
+    end
+  end
+  --self:debug(string.format("%s : %s , %s", btn, col, row))
+  self:displayFocus()  
+end
+
+setmetatable(Scroll, {
+  __index = Widget,
+  __call = Scroll.create
+})
+
 -- Label widget, text only ------------------------------
 Label = {type="label"}
 Label.__index = Label
@@ -551,6 +682,7 @@ function Label:create(arg)
   label.focus = arg.focus or nil
   label.align = arg.align or "center" -- left, right, center
   label.valign = arg.valign or "middle" -- top, middle, bottom
+  label.scroll = arg.scrool or "none" -- none, vert, horz, both, auto
   label.value = splitLines(arg.value)
 
   return label
@@ -561,6 +693,18 @@ function Label:render()
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local top = self.top + self.padding
+  local vscroll = self.scroll == "both" or self.scroll == "vert"
+      or (self.scroll == "auto" and #self.value > rows)
+  local maxCols = 0
+  if self.scroll == "auto" then
+    for i, val in ipairs(self.value) do
+      if #val > maxCols then
+        maxCols = #val
+      end
+    end
+  end
+  local hscroll = self.scroll == "both" or self.scroll == "horz"
+      or (self.scroll == "auto" and maxCols > cols)
   if self.valign == "top" then
   elseif self.valign == "bottom" then
     top = math.max(top, top + rows - #self.value)
