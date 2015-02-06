@@ -645,21 +645,23 @@ function Scroll:set(amount)
 end
 
 function Scroll:mouse_click(btn, col, row)
+  self:debug(col)
+  self:debug(row)
   self:setFocus()
   if self.type == "vert" then
     if row == self.top + self.padding then
-      --self:debug("dec")
+      self:debug("dec")
       self:dec(1)
     elseif row == self.top + self.rows - self.padding - 1 then
-      --self:debug("inc")
+      self:debug("inc")
       self:inc(1)
     end
   else
     if col == self.left + self.padding then
-      --self:debug("dec")
+      self:debug("dec")
       self:dec(1)
     elseif col == self.left + self.cols - self.padding - 1 then
-      --self:debug("inc")
+      self:debug("inc")
       self:inc(1)
     end
   end
@@ -682,7 +684,7 @@ function Label:create(arg)
   label.focus = arg.focus or nil
   label.align = arg.align or "center" -- left, right, center
   label.valign = arg.valign or "middle" -- top, middle, bottom
-  label.scroll = arg.scrool or "none" -- none, vert, horz, both, auto
+  label.scroll = arg.scroll or "none" -- none, vert, horz, both, auto
   label.value = splitLines(arg.value)
 
   return label
@@ -693,8 +695,9 @@ function Label:render()
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
   local top = self.top + self.padding
+  local left = self.left + self.padding
   local vscroll = self.scroll == "both" or self.scroll == "vert"
-      or (self.scroll == "auto" and #self.value > rows)
+    or (self.scroll == "auto" and #self.value > rows)
   local maxCols = 0
   if self.scroll == "auto" then
     for i, val in ipairs(self.value) do
@@ -704,7 +707,38 @@ function Label:render()
     end
   end
   local hscroll = self.scroll == "both" or self.scroll == "horz"
-      or (self.scroll == "auto" and maxCols > cols)
+    or (self.scroll == "auto" and maxCols > cols)
+  -- create or hide scroll bars
+  local ascroll = 0
+  if vscroll and hscroll then
+    ascroll = 1
+  end
+  if vscroll and self.vscroll == nil then
+    self:debug("create vscroll")
+    self.vscroll = Scroll{min = 1, max = #self.value, range = rows - ascroll, type = "vert"}
+    self.vscroll.outside = self.outside
+    self.vscroll:resize(left + cols - 1, top, 1, rows - ascroll, self.term)
+  end
+  if hscroll and self.hscroll == nil then
+    self:debug("create hscroll")
+    self.hscroll = Scroll{min = 1, max = maxCols, range = cols - ascroll, type = "horz"}
+    self.hscroll.outside = self.outside
+    self.hscroll:resize(left, top + rows - 1, cols - ascroll, 1, self.term)
+  end
+
+  -- render scroll bars
+  if vscroll and self.vscroll then
+    self:debug("render vscroll")
+    self.vscroll:render()
+    cols = cols - 1
+  end
+  if hscroll and self.hscroll then
+    self:debug("render vscroll")
+    self.hscroll:render()
+    rows = rows - 1
+  end
+
+  -- render text
   if self.valign == "top" then
   elseif self.valign == "bottom" then
     top = math.max(top, top + rows - #self.value)
@@ -713,23 +747,39 @@ function Label:render()
   end
   self.term.setTextColor(self.textColor)
   self.term.setBackgroundColor(self.backgroundColor)
-  for i, val in ipairs(self.value) do
-    local left = self.left + self.padding
+  local vstart = 1
+  if self.vscroll then
+    vstart = self.vscroll.value
+  end
+  local hstart = 1
+  if self.hscroll then
+    hstart = self.hscroll.value
+  end
+  for i = vstart, vstart + rows - 1 do
+    local val = self.value[i] or ""
+    left = self.left + self.padding
     if self.align == "left" then
     elseif self.align == "right" then
       left = math.max(left, left + cols - #val)
     else -- default to center
       left = math.max(left, left + math.floor((cols - #val)/2))
     end
-    self.term.setCursorPos(left, top + i - 1)
-    self.term.write(val:sub(1, cols))
-    if i >= rows then
-      break
-    end
+    self.term.setCursorPos(left, top + i - vstart)
+    self.term.write(val:sub(hstart, hstart + cols - 1))
   end
 end
 
 Label.display = Widget.wrapDisplay(Label.render)
+
+function Label:mouse_click(btn, col, row)
+  if self.vscroll then
+    self.vscroll:mouse_click(btn, col, row)
+  end
+  if self.hscroll then
+    self.hscroll:mouse_click(btn, col, row)
+  end
+  self:display()
+end
 
 setmetatable(Label, {
   __index = Widget,
@@ -831,9 +881,9 @@ function Spinner:create(arg)
   local spinner = Widget.create(self, arg)
 
   spinner.focus = arg.focus or nil
-  spinner.value = math.floor(tonumber(arg.value))
   spinner.min = math.floor(tonumber(arg.min or 0))
   spinner.max = math.floor(tonumber(arg.max or 9))
+  spinner.value = math.floor(tonumber(arg.value or spinner.min))
 
   return spinner
 end
