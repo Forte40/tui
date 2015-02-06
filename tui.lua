@@ -7,6 +7,9 @@ local names = {}
 
 function splitLines(str)
   local lines = {}
+  if str == nil then
+    return lines
+  end
   local pos = 0
   while true do
     local newPos = str:find("\n", pos)
@@ -98,7 +101,6 @@ function Widget.wrapDisplay(fn)
     if final == nil then
       final = true
     end
-    --self:debug("display "..self.name..(final and "*" or ""))
     if final then
       local widget = self
       while widget.window == nil do
@@ -110,7 +112,6 @@ function Widget.wrapDisplay(fn)
     fn(self, final)
     if final then
       window.setVisible(true)
-      --self:debug("draw")
     end
   end
 end
@@ -118,7 +119,6 @@ end
 function Widget:render()
   -- display border and background
   for row = self.top, self.top + self.rows - 1 do
-    --sleep(0.02)
     for col = self.left, self.left + self.cols - 1 do
       if row < self.top + self.padding
           or row > self.top + self.rows - 1 - self.padding then
@@ -185,7 +185,6 @@ function Widget:run(term, debugTerm)
   debugTerm.clear()
   debugTerm.setCursorPos(1, 1)
   self.running = true
-  --term.clear()
   local cols, rows = term.getSize()
   self.window = window.create(term.current(), 1, 1, cols, rows)
   self:resize(1, 1, cols, rows, self.window)
@@ -212,11 +211,20 @@ function Widget:run(term, debugTerm)
     -- trickle down listeners
     while widget ~= nil do
       table.insert(widgets, 1, widget)
-      -- look for listener on current widget
-      if widget["capture_" .. event.name] ~= nil then
-        local result = widget["capture_" .. event.name](widget, unpack(event))
-        if result == false then
-          propagate = false
+      -- look for listeners on current widget
+      local fns = widget["capture_" .. event.name]
+      if fns ~= nil then
+        if type(fns) == "function" then
+          fns = {fns}
+        end
+        for _, fn in ipairs(fns) do
+          local result = fn(widget, unpack(event))
+          if result == false then
+            propagate = false
+            break
+          end
+        end
+        if not propagate then
           break
         end
       end
@@ -674,11 +682,11 @@ setmetatable(Scroll, {
   __call = Scroll.create
 })
 
--- Label widget, text only ------------------------------
-Label = {type="label"}
-Label.__index = Label
+-- Text widget, text only ------------------------------
+Text = {type="label"}
+Text.__index = Text
 
-function Label:create(arg)
+function Text:create(arg)
   local label = Widget.create(self, arg)
 
   label.focus = arg.focus or nil
@@ -690,7 +698,7 @@ function Label:create(arg)
   return label
 end
 
-function Label:render()
+function Text:render()
   Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
@@ -713,17 +721,27 @@ function Label:render()
   if vscroll and hscroll then
     ascroll = 1
   end
-  if vscroll and self.vscroll == nil then
-    self:debug("create vscroll")
-    self.vscroll = Scroll{min = 1, max = #self.value, range = rows - ascroll, type = "vert"}
-    self.vscroll.outside = self.outside
-    self.vscroll:resize(left + cols - 1, top, 1, rows - ascroll, self.term)
+  if vscroll then
+    if self.vscroll == nil then
+      self:debug("create vscroll")
+      self.vscroll = Scroll{min = 1, max = #self.value, range = rows - ascroll, type = "vert"}
+      self.vscroll.outside = self.outside
+      self.vscroll:resize(left + cols - 1, top, 1, rows - ascroll, self.term)
+    else
+      self.vscroll.max = #self.value
+      self.vscroll:update()
+    end
   end
-  if hscroll and self.hscroll == nil then
-    self:debug("create hscroll")
-    self.hscroll = Scroll{min = 1, max = maxCols, range = cols - ascroll, type = "horz"}
-    self.hscroll.outside = self.outside
-    self.hscroll:resize(left, top + rows - 1, cols - ascroll, 1, self.term)
+  if hscroll then
+    if self.hscroll == nil then
+      self:debug("create hscroll")
+      self.hscroll = Scroll{min = 1, max = maxCols, range = cols - ascroll, type = "horz"}
+      self.hscroll.outside = self.outside
+      self.hscroll:resize(left, top + rows - 1, cols - ascroll, 1, self.term)
+    else
+      self.hscroll.max = maxCols
+      self.hscroll:update()
+    end
   end
 
   -- render scroll bars
@@ -769,9 +787,24 @@ function Label:render()
   end
 end
 
-Label.display = Widget.wrapDisplay(Label.render)
+Text.display = Widget.wrapDisplay(Text.render)
 
-function Label:mouse_click(btn, col, row)
+function Text:append(str)
+  local last = #self.value
+  if last == 0 then
+    self.value = {str}
+  else
+    self.value[last] = self.value[last] .. str
+  end
+  self:display()
+end
+
+function Text:appendLine(str)
+  table.insert(self.value, str)
+  self:display()
+end
+
+function Text:mouse_click(btn, col, row)
   if self.vscroll then
     self.vscroll:mouse_click(btn, col, row)
   end
@@ -781,16 +814,16 @@ function Label:mouse_click(btn, col, row)
   self:display()
 end
 
-setmetatable(Label, {
+setmetatable(Text, {
   __index = Widget,
-  __call = Label.create
+  __call = Text.create
 })
 
--- Text widget ----------------------------------------------------------------
-Text = {type="text"}
-Text.__index = Text
+-- Edit widget ----------------------------------------------------------------
+Edit = {type="text"}
+Edit.__index = Edit
 
-function Text:create(arg)
+function Edit:create(arg)
   local text = Widget.create(self, arg)
 
   text.focus = arg.focus or nil
@@ -800,7 +833,7 @@ function Text:create(arg)
   return text
 end
 
-function Text:render()
+function Edit:render()
   Widget.render(self)
   local rows = self.rows - self.padding * 2
   local cols = self.cols - self.padding * 2
@@ -813,22 +846,22 @@ function Text:render()
   self.term.write(text:sub(1, cols))
 end
 
-Text.display = Widget.wrapDisplay(Text.render)
+Edit.display = Widget.wrapDisplay(Edit.render)
 
-function Text:displayFocus()
+function Edit:displayFocus()
   local top = self.top + self.padding
   local left = self.left + self.padding + self.pos  
   self.term.setCursorPos(left, top)
   self.term.setCursorBlink(true)
 end
 
-function Text:mouse_click()
+function Edit:mouse_click()
   self:setFocus()
   self:display()
   self:displayFocus()
 end
 
-function Text:char(char)
+function Edit:char(char)
   self.value = self.value:sub(1, self.pos) .. char .. self.value:sub(self.pos + 1)
   self.pos = self.pos + 1
   self:display()
@@ -836,7 +869,7 @@ function Text:char(char)
   return false
 end
 
-function Text:key(key)
+function Edit:key(key)
   if key == keys.delete then
     if self.pos < self.value:len() then
       self.value = self.value:sub(1, self.pos) .. self.value:sub(self.pos + 2)
@@ -868,9 +901,9 @@ function Text:key(key)
   return false
 end
 
-setmetatable(Text, {
+setmetatable(Edit, {
   __index = Widget,
-  __call = Text.create
+  __call = Edit.create
 })
 
 -- Spinner widget, number with buttons to increase or decrease value ------
@@ -1018,7 +1051,13 @@ function listen(widget, event, fn, capture)
     end
   end
   if type(widget) == "table" and widget.name then
-    widget[event] = fn
+    if not widget[event] then
+      widget[event] = {fn}
+    elseif type(widget[event]) == "function" then
+      widget[event] = {widget[event], fn}
+    else
+      table.insert(widget[event], fn)
+    end
   else
     error("listener not attached, "..tostring(widget))
   end
