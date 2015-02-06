@@ -182,8 +182,10 @@ end
 
 function Widget:run(term, debugTerm)
   self.debugTerm = debugTerm
-  debugTerm.clear()
-  debugTerm.setCursorPos(1, 1)
+  if self.debugTerm then
+    debugTerm.clear()
+    debugTerm.setCursorPos(1, 1)
+  end
   self.running = true
   local cols, rows = term.getSize()
   self.window = window.create(term.current(), 1, 1, cols, rows)
@@ -712,6 +714,9 @@ function Text:render()
   local cols = self.cols - self.padding * 2
   local top = self.top + self.padding
   local left = self.left + self.padding
+  if type(self.value) == "string" then
+    self.value = {self.value}
+  end
   local vscroll = self.scroll == "both" or self.scroll == "vert"
     or (self.scroll == "auto" and #self.value > rows)
   local maxCols = 0

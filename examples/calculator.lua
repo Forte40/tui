@@ -112,7 +112,7 @@ local calculator = Grid{
   backgroundColor=colors.gray,
   inside={
     Button{name="close", text="X", backgroundColor=colors.gray, textColor=colors.red},
-    Label{name="number_field", text="0", colSpan=5, backgroundColor=colors.lime, textColor=colors.black},
+    Text{name="number_field", text="0", colSpan=5, backgroundColor=colors.lime, textColor=colors.black},
     Button{name="recall", text="MR", backgroundColor=colors.purple},
     Button{name="number7", text="7", data=7, backgroundColor=colors.lightBlue},
     Button{name="number8", text="8", data=8, backgroundColor=colors.lightBlue},
@@ -216,12 +216,12 @@ end
 function calculator:show()
   if calc.op then
     if calc.scan then
-      number_field.text = tostring(calc.num) .. " " .. calc.op .. " " .. tostring(calc.display)
+      number_field.value = tostring(calc.num) .. " " .. calc.op .. " " .. tostring(calc.display)
     else
-      number_field.text = tostring(calc.display) .. " " .. calc.op
+      number_field.value = tostring(calc.display) .. " " .. calc.op
     end
   else
-    number_field.text = tostring(calc.display)
+    number_field.value = tostring(calc.display)
   end
   number_field:display()
 end
