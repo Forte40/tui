@@ -244,10 +244,19 @@ function Widget:run(term, debugTerm)
     -- bubble up listeners
     if propagate then
       for i, widget in ipairs(widgets) do
-        if widget[event.name] ~= nil then
-          local result = widget[event.name](widget, unpack(event))
-          if result == false then
-            propagate = false
+        local fns = widget[event.name]
+        if fns ~= nil then
+          if type(fns) == "function" then
+            fns = {fns}
+          end
+          for _, fn in ipairs(fns) do
+            local result = fn(widget, unpack(event))
+            if result == false then
+              propagate = false
+              break
+            end
+          end
+          if not propagate then
             break
           end
         end
@@ -653,28 +662,27 @@ function Scroll:set(amount)
 end
 
 function Scroll:mouse_click(btn, col, row)
-  self:debug(col)
-  self:debug(row)
+  local propagate = true
   self:setFocus()
   if self.type == "vert" then
     if row == self.top + self.padding then
-      self:debug("dec")
       self:dec(1)
+      propagate = false
     elseif row == self.top + self.rows - self.padding - 1 then
-      self:debug("inc")
       self:inc(1)
+      propagate = false
     end
   else
     if col == self.left + self.padding then
-      self:debug("dec")
       self:dec(1)
+      propagate = false
     elseif col == self.left + self.cols - self.padding - 1 then
-      self:debug("inc")
       self:inc(1)
+      propagate = false
     end
   end
-  --self:debug(string.format("%s : %s , %s", btn, col, row))
   self:displayFocus()  
+  return propagate
 end
 
 setmetatable(Scroll, {
@@ -805,13 +813,15 @@ function Text:appendLine(str)
 end
 
 function Text:mouse_click(btn, col, row)
+  local propagate = true
   if self.vscroll then
-    self.vscroll:mouse_click(btn, col, row)
+    propagate = self.vscroll:mouse_click(btn, col, row)
   end
   if self.hscroll then
-    self.hscroll:mouse_click(btn, col, row)
+    propagate = self.hscroll:mouse_click(btn, col, row)
   end
   self:display()
+  return propagate
 end
 
 setmetatable(Text, {
