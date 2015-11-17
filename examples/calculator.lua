@@ -1,4 +1,4 @@
-loadfile("tui.lua")()
+loadfile("tui")()
 
 -- calculator logic
 local calc = {
