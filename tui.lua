@@ -316,6 +316,11 @@ function Widget:stop()
   end
 end
 
+setmetatable(Widget, {
+  __index = Widget,
+  __call = Widget.create
+})
+
 -- Base Class for all widgets that contain widgets ----------------------------
 Container = {type="container"}
 Container.__index = Container
@@ -533,8 +538,8 @@ function Grid:create(opt)
 
   -- set container default properties
   grid.title = opt.title
-  grid.gridRows = opt.gridRows or 1
-  grid.gridCols = opt.gridCols or 1
+  grid.grid_rows = opt.grid_rows or 1
+  grid.grid_cols = opt.grid_cols or 1
 
   return grid
 end
@@ -542,41 +547,48 @@ end
 function Grid:resize(left, top, cols, rows, term)
   left, top, cols, rows = Container.resize(self, left, top, cols, rows, term)
   -- calc grid spaces
-  local gridRowSize = math.floor((rows - self.spacing * (self.gridRows - 1))/self.gridRows)
-  local gridColSize = math.floor((cols - self.spacing * (self.gridCols - 1))/self.gridCols)
+  local grid_row_size = math.floor((rows - self.spacing * (self.grid_rows - 1))/self.grid_rows)
+  local grid_col_size = math.floor((cols - self.spacing * (self.grid_cols - 1))/self.grid_cols)
   -- center grid spaces in left over space
-  top = top + math.floor((rows - ((gridRowSize + self.spacing) * self.gridRows - self.spacing)) / 2)
-  left = left + math.floor((cols - ((gridColSize + self.spacing) * self.gridCols - self.spacing)) / 2)
+  top = top + math.floor((rows - ((grid_row_size + self.spacing) * self.grid_rows - self.spacing)) / 2)
+  left = left + math.floor((cols - ((grid_col_size + self.spacing) * self.grid_cols - self.spacing)) / 2)
   -- fill in grid spaces
-  local gridRow = 1
-  local gridCol = 1
+  local grid_row = 1
+  local grid_col = 1
   local grid = {} -- available spaces
-  for row = 1, self.gridRows do
+  for row = 1, self.grid_rows do
     grid[row] = {}
-    for col = 1, self.gridCols do
+    for col = 1, self.grid_cols do
       grid[row][col] = true
     end
   end
   if self.inside then
     for i, widget in ipairs(self.inside) do
-      -- find next free grid space
-      while true do
-        if grid[gridRow] and grid[gridRow][gridCol] then
-          break
-        else
-          gridCol = gridCol + 1
-          if gridCol > self.gridCols then
-            gridCol = 1
-            gridRow = gridRow + 1
-            if gridRow > self.gridRows then
-              error("grid is not large enough: "..self.name)
+      -- use config or find next free grid space
+      if widget.grid_col and widget.grid_row then
+        grid_col = widget.grid_col
+        grid_row = widget.grid_row
+      else
+        grid_col = 1
+        grid_row = 1
+        while true do
+          if grid[grid_row] and grid[grid_row][grid_col] then
+            break
+          else
+            grid_col = grid_col + 1
+            if grid_col > self.grid_cols then
+              grid_col = 1
+              grid_row = grid_row + 1
+              if grid_row > self.grid_rows then
+                error("grid is not large enough: "..self.name)
+              end
             end
           end
         end
       end
       -- ensure widget has room to fit
-      for row = gridRow, gridRow + widget.rowSpan - 1 do
-        for col = gridCol, gridCol + widget.colSpan - 1 do
+      for row = grid_row, grid_row + widget.rowSpan - 1 do
+        for col = grid_col, grid_col + widget.colSpan - 1 do
           if grid[row] and grid[row][col] then
             grid[row][col] = false
           else
@@ -584,10 +596,10 @@ function Grid:resize(left, top, cols, rows, term)
           end
         end
       end
-      widget:resize(left + (gridCol - 1) * (gridColSize + self.spacing),
-                    top + (gridRow - 1) * (gridRowSize + self.spacing),
-                    (gridColSize + self.spacing) * widget.colSpan - self.spacing,
-                    (gridRowSize + self.spacing) * widget.rowSpan - self.spacing,
+      widget:resize(left + (grid_col - 1) * (grid_col_size + self.spacing),
+                    top + (grid_row - 1) * (grid_row_size + self.spacing),
+                    (grid_col_size + self.spacing) * widget.colSpan - self.spacing,
+                    (grid_row_size + self.spacing) * widget.rowSpan - self.spacing,
                     term)
     end
   end
